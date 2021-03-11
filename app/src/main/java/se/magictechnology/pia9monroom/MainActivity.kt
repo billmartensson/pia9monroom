@@ -3,7 +3,11 @@ package se.magictechnology.pia9monroom
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.room.*
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -13,23 +17,52 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
+
+    var catadapter = CategoryAdapter()
+
+    lateinit var databasStuff : ProductDB
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE product ADD COLUMN catid INTEGER")
-            }
+        databasStuff = ProductDB(this)
+
+        catadapter.databasStuff = databasStuff
+
+        var catrv = findViewById<RecyclerView>(R.id.categoriesRV)
+
+        catrv.layoutManager = LinearLayoutManager(this)
+        catrv.adapter = catadapter
+
+
+
+        findViewById<Button>(R.id.categoryAddButton).setOnClickListener {
+
+            var categoryName = findViewById<EditText>(R.id.categoryNameEdittext).text.toString()
+
+            databasStuff.createCategory(categoryName)
+
         }
 
-        val db = Room.databaseBuilder(
-                applicationContext,
-                AppDatabase::class.java, "pia9product"
-        ).addMigrations(MIGRATION_2_3).build()
+        databasStuff.categories.observe(this, { allCats ->
+            /*
+            for(cat in allCats)
+            {
+                Log.d("pia9debug", cat.categoryName!!)
+            }
+             */
+            catadapter.categories = allCats
+            catadapter.notifyDataSetChanged()
+        })
+
+        databasStuff.getCategories()
 
 
-        var testkategori = Category(categoryName = "Möbler")
+
+        /*
+
+        var testkategori = ProductDB.Category(categoryName = "Möbler")
 
         launch(Dispatchers.IO) {
             /*
@@ -44,7 +77,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             */
             //db.categoryDao().insertAll(testkategori)
 
-            var alltheproducts = db.productDao().getCat(2)
+            var alltheproducts = databasStuff.db.productDao().getCat(2)
 
             var productsText = ""
             for(prod in alltheproducts)
@@ -62,64 +95,12 @@ class MainActivity : AppCompatActivity(), CoroutineScope by MainScope() {
             }
 
         }
-
+        */
     }
+
+
+
+
 }
 
-@Entity
-data class Product(
-        @PrimaryKey(autoGenerate = true) val pid: Int = 0,
-        @ColumnInfo(name = "product_name") val productName: String?,
-        @ColumnInfo(name = "product_price") val productPrice: Int?,
-        val catid : Int?
-) {
-
-    fun getPrettyInfo() : String
-    {
-        return productName!! + " " + productPrice.toString()
-    }
-}
-
-@Dao
-interface ProductDao {
-    @Query("SELECT * FROM product")
-    fun getAll(): List<Product>
-
-    @Query("SELECT * FROM product WHERE product_price > :price")
-    fun getExpensive(price : Int): List<Product>
-
-    @Query("SELECT * FROM product WHERE catid = :cid")
-    fun getCat(cid : Int): List<Product>
-
-
-    @Insert
-    fun insertAll(product: Product)
-
-    @Delete
-    fun delete(product: Product)
-}
-
-@Entity
-data class Category(
-        @PrimaryKey(autoGenerate = true) val pid: Int = 0,
-        @ColumnInfo(name = "category_name") val categoryName: String?
-)
-
-@Dao
-interface CategoryDao {
-    @Query("SELECT * FROM category")
-    fun getAll(): List<Category>
-
-    @Insert
-    fun insertAll(category: Category)
-
-    @Delete
-    fun delete(category: Category)
-}
-
-@Database(entities = arrayOf(Product::class,Category::class), version = 3)
-abstract class AppDatabase : RoomDatabase() {
-    abstract fun productDao(): ProductDao
-    abstract fun categoryDao(): CategoryDao
-}
 
